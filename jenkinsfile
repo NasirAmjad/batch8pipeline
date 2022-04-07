@@ -1,0 +1,68 @@
+pipeline{
+    agent{label 'nodeb4'}
+    tools{maven 'mvn-3.0.5'}
+    stages{
+        stage('msg'){
+            steps{
+                echo "welcome to jenkins pipeline job"
+                
+            }
+        }
+        stage('checkout'){
+            steps{
+                checkout([$class: 'GitSCM', branches: [[name: '*/Release_16']], extensions: [], userRemoteConfigs: [[credentialsId: 'GIT', url: 'https://gitlab.com/4reysn/batch8.git']]])
+            }
+        }
+        stage('Build'){
+            steps{
+                sh 'mvn package -f pom.xml'
+            }
+        }
+        stage('Dev deployement'){
+            steps{
+                deploy adapters: [tomcat9(credentialsId: 'TOMCAT', path: '', url: 'http://34.131.0.125:8090')], contextPath: null, war: 'target/flipkart.war'
+            }
+        }
+        stage('Approvals to deployment in STAGE env'){
+            steps{
+                echo "Taking approval from Manager to deploy wars"
+           timeout(time: 7, unit: 'DAYS') {
+            input message: 'Do you want to deploy  wars in stage n DEV env?', submitter: 'nasiramjad999'
+            }
+            }
+        }
+        stage('STAGE deployment '){
+            steps{
+                deploy adapters: [tomcat9(credentialsId: 'TOMCAT', path: '', url: 'http://34.131.0.125:8090')], contextPath: null, war: 'target/flipkart.war'
+            }
+        }
+        stage('Approvals to deployment in PRE-PROD '){
+            steps{
+                echo "Taking approval from Manager to deploy war i PRE-PROD env "
+                timeout(time: 7, unit: 'DAYS') {
+                input message: 'Do you want to deploy  war in PRE- PROD env?', submitter: 'nasiramjad999'
+            }
+            }
+        }
+        stage('PRE-PROD deployement'){
+            steps{
+                deploy adapters: [tomcat9(credentialsId: 'TOMCAT', path: '', url: 'http://34.131.0.125:8090')], contextPath: null, war: 'target/flipkart.war'
+            }
+        }
+        stage('Approvals to NEXUS REPO'){
+            steps{
+                echo "Taking approval from Manager to move want to NEXUS REPO "
+                timeout(time: 7, unit: 'DAYS') {
+                input message: 'Do you want to Move war to NEXUS REPO?', submitter: 'nasiramjad999'
+            }
+            }
+        }
+        stage('NEXUS Artifactory'){
+            steps{
+                nexusArtifactUploader artifacts: [[artifactId: 'flipkart', classifier: '', file: 'target/flipkart.war', type: 'war']], credentialsId: 'nexus', groupId: 'com.tcs', nexusUrl: '34.102.69.96:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'batch7-repo', version: '1.0-SNAPSHOT'
+                
+            }
+        }
+        
+    }
+}
